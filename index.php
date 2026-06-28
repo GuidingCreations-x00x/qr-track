@@ -49,7 +49,7 @@ if (preg_match('#^/p/([a-f0-9]+)$#i', $requestUri, $m)) {
 
 require_auth();
 
-define('PAGE_TITLE', 'Dashboard | Tuxxin QR Track');
+define('PAGE_TITLE', 'Dashboard | Tracking LaB');
 
 const ALLOWED_TYPES = ['url', 'phone', 'map', 'vcard', 'wifi', 'sms', 'email', 'social'];
 

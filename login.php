@@ -43,8 +43,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
-    <title>Login | Tuxxin QR Track</title>
-    <link rel="icon" type="image/png" href="<?= htmlspecialchars(BASE_URL) ?>/tuxxin-qr-track.png">
+        <title>Login | Tracking LaB</title>
+        <link rel="icon" type="image/svg+xml" href="https://sienna-tiger-551178.hostingersite.com/assets/logo.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Recursive:wght@300..900&display=swap" rel="stylesheet">
     <style>
@@ -61,8 +61,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body>
     <div class="login-card">
-        <img src="<?= htmlspecialchars(BASE_URL) ?>/logo-v2.png" alt="Tuxxin QR Track Logo" class="logo">
-        <h2>Admin Login</h2>
+        <img src="<?= htmlspecialchars(BASE_URL) ?>/assets/logo.svg" alt="Tracking LaB" class="logo" style="width:auto;height:60px;">
+                <h2>Tracking La<b style="color:var(--accent);">B</b></h2>
         <?php if ($error): ?>
             <div class="error"><?= htmlspecialchars($error) ?></div>
         <?php endif; ?>

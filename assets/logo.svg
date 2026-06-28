@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60" width="200" height="60">
+  <defs>
+    <linearGradient id="tlg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ff7700"/>
+      <stop offset="100%" style="stop-color:#ff5500"/>
+    </linearGradient>
+  </defs>
+  <!-- TL Monogram tile -->
+  <rect x="4" y="4" width="52" height="52" rx="8" fill="url(#tlg)"/>
+  <text x="12" y="22" font-family="Arial,Helvetica,sans-serif" font-weight="900" font-size="14" fill="#1a1a2e">T</text>
+  <text x="12" y="46" font-family="Arial,Helvetica,sans-serif" font-weight="900" font-size="32" fill="#ffffff">L</text>
+  <!-- Brand text -->
+  <text x="66" y="26" font-family="Arial,Helvetica,sans-serif" font-weight="300" font-size="12" fill="#888" letter-spacing="2">TRACKING</text>
+  <text x="66" y="48" font-family="Arial,Helvetica,sans-serif" font-size="22" fill="#e0e0e0" letter-spacing="1">
+    <tspan font-weight="300">La</tspan>
+    <tspan font-weight="800" fill="#ff7700">B</tspan>
+  </text>
+</svg>

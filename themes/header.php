@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
-    <title><?= defined('PAGE_TITLE') ? htmlspecialchars(PAGE_TITLE) : 'Tuxxin QR Track' ?></title>
-    <link rel="icon" type="image/png" href="<?= htmlspecialchars(BASE_URL) ?>/tuxxin-qr-track.png">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <title><?= defined('PAGE_TITLE') ? htmlspecialchars(PAGE_TITLE) : 'Tracking LaB' ?></title>
+        <link rel="icon" type="image/svg+xml" href="<?= htmlspecialchars(BASE_URL) ?>/assets/logo.svg">
+        <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Recursive:wght@300..900&display=swap" rel="stylesheet">
     <style>
         :root { --bg: #121212; --card: #1e1e1e; --text: #e0e0e0; --accent: #ff6600; --border: #333; --danger: #ff4444; --info: #007bff; }
@@ -81,10 +81,10 @@
 <div class="container">
     <header>
         <div class="header-brand">
-            <img src="<?= htmlspecialchars(BASE_URL) ?>/logo-v2.png" alt="Tuxxin QR Track Logo" class="logo-img">
-            <div>
-                <h1>Tuxxin QR Track</h1>
-                <small style="color: #666;">Generate &amp; Track QR Codes Easily!</small>
+            <img src="<?= htmlspecialchars(BASE_URL) ?>/assets/logo.svg" alt="Tracking LaB" class="logo-img" style="height: 55px;">
+                        <div>
+                            <h1>Tracking La<b style="background:none;-webkit-text-fill-color:initial;color:var(--accent);">B</b></h1>
+                            <small style="color: #666;">Self-Hosted QR Code Tracking</small>
             </div>
         </div>
 
