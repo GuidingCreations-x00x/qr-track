@@ -3,47 +3,38 @@ declare(strict_types=1);
 
 // --- AUTHENTICATION SETTINGS ---
 define('ADMIN_USER', 'admin');
-define('ADMIN_PASS', 'change_me');
+define('ADMIN_PASS', '0IVUW2SA2pmPXtEa');
 
 // --- API SETTINGS ---
-// Generate a secure random key using the generator on the API Docs page, or run:
-// php -r "echo bin2hex(random_bytes(32));"
-define('API_KEY', 'change_me_to_a_random_string');
+// Generated: 2026-06-28 for GuidingCreations-x00x/qr-track
+define('API_KEY', '109851ad435a40fa47ce82271ffa0997de4e147fdc9ccbfc6e9c8afe7d5de79b');
 
 // --- SITE SETTINGS ---
-// No trailing slash. Examples:
-//   Root install:      'https://yourdomain.com'
-//   Subdir install:    'https://yourdomain.com/qr-track'
-define('BASE_URL',   'https://yourdomain.com');
+define('BASE_URL',   'https://sienna-tiger-551178.hostingersite.com');
 
-// Absolute paths — place OUTSIDE your web root for security
-define('DB_PATH',    '/home/youruser/db/tuxxin_qr.sqlite');
-define('LOGO_DIR',   '/home/youruser/tmp');
+// Absolute paths — data dir is in public_html/qr-data/ (protected by .htaccess)
+define('DB_PATH',    '/home/u716917981/domains/sienna-tiger-551178.hostingersite.com/public_html/qr-data/tuxxin_qr.sqlite');
+define('LOGO_DIR',   '/home/u716917981/domains/sienna-tiger-551178.hostingersite.com/public_html/qr-data/logos');
 
-define('TIMEZONE',   'America/New_York');
+define('TIMEZONE',   'America/Chicago');
 define('THEME_PATH', __DIR__ . '/themes');
 
 // --- NETWORK SETTINGS ---
-// Set true if your server is behind a Cloudflare Tunnel or similar reverse proxy
 define('USE_CLOUDFLARE_TUNNEL', false);
 
 // --- DISABLED QR CODE PAGE ---
-// Where to redirect when a QR code is inactive.
-// Set to a full URL (e.g. 'https://yourdomain.com') or leave '' to show the built-in "Link Inactive" page.
 define('DISABLED_REDIRECT_URL', '');
 
 // --- API RATE THROTTLING ---
-// Limits requests per IP to prevent abuse. Set API_THROTTLE_ENABLED to false to disable.
 define('API_THROTTLE_ENABLED', true);
-define('API_THROTTLE_LIMIT',  60);   // Max requests per window per IP
-define('API_THROTTLE_WINDOW', 60);   // Window size in seconds
+define('API_THROTTLE_LIMIT',  60);
+define('API_THROTTLE_WINDOW', 60);
 
 // --- SESSION SETTINGS ---
-// Seconds of inactivity before the admin session expires (default: 2 hours)
 define('SESSION_LIFETIME', 7200);
 
 // =============================================================================
-// END OF CONFIGURATION — do not edit below this line
+// END OF CONFIGURATION
 // =============================================================================
 
 function require_auth() {
