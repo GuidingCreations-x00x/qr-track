@@ -4,7 +4,7 @@ require_auth();
 
 define('PAGE_TITLE', 'Analytics | Tracking LaB');
 
-// ── QUERY: Group by destination URL ─────────────────────────────────────────
+// ── QUERY 1: URL groups (aggregate per destination URL) ────────────────────
 $stmt = $db->query("
     SELECT
         p.target_data,
@@ -19,38 +19,147 @@ $stmt = $db->query("
     ORDER BY total_scans DESC
 ");
 
-$rows = $stmt->fetchAll();
+$urlGroups = $stmt->fetchAll();
 
-// Find the max scan count so we can normalise bar widths
-$maxScans = $rows ? max(array_column($rows, 'total_scans')) : 0;
+// ── QUERY 2: Individual QR code scan counts ────────────────────────────────
+$stmt2 = $db->query("
+    SELECT
+        p.uuid,
+        p.title,
+        p.target_data,
+        COUNT(s.id) AS scan_count
+    FROM products p
+    LEFT JOIN scans s ON p.uuid = s.product_uuid
+    WHERE p.type = 'url'
+      AND p.is_deleted = 0
+    GROUP BY p.uuid
+    ORDER BY p.target_data, scan_count DESC
+");
+
+$allQrs = $stmt2->fetchAll();
+
+// Organise QR codes by target_data
+$qrByUrl = [];
+foreach ($allQrs as $qr) {
+    $url = $qr['target_data'];
+    $qrByUrl[$url][] = $qr;
+}
+
+// Find the max scan count so we can normalise bar widths (per group)
+$maxScans = $urlGroups ? max(array_column($urlGroups, 'total_scans')) : 0;
+
+// Find max individual QR scan count for nested bar widths
+$maxQrScans = $allQrs ? max(array_column($allQrs, 'scan_count')) : 0;
 
 // ── RENDER ──────────────────────────────────────────────────────────────────
 define('SHOW_ADD_BTN', true);
 include THEME_PATH . '/header.php';
 ?>
 <style>
-    .analytics-table {
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.95rem;
+        margin-bottom: 20px;
+    }
+    .back-link:hover {
+        text-decoration: underline;
+    }
+    .url-group {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        margin-bottom: 20px;
+        overflow: hidden;
+    }
+    .url-group-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 20px;
+        background: rgba(255,255,255,0.03);
+        border-bottom: 1px solid var(--border);
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .url-group-header .url-display {
+        word-break: break-all;
+        color: var(--text);
+        font-size: 0.95rem;
+        flex: 1;
+        min-width: 0;
+    }
+    .url-group-header .url-display a {
+        color: var(--accent);
+        text-decoration: none;
+    }
+    .url-group-header .url-display a:hover {
+        text-decoration: underline;
+    }
+    .url-group-header .url-stats {
+        display: flex;
+        gap: 20px;
+        flex-shrink: 0;
+    }
+    .url-group-header .url-stat-item {
+        text-align: center;
+    }
+    .url-group-header .url-stat-item .num {
+        font-size: 1.3rem;
+        font-weight: 800;
+        color: var(--accent);
+    }
+    .url-group-header .url-stat-item .lbl {
+        font-size: 0.7rem;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+    .url-group-header .url-bar-bg {
+        width: 100%;
+        height: 4px;
+        background: #2a2a2a;
+        border-radius: 2px;
+        overflow: hidden;
+        margin-top: 8px;
+        flex-basis: 100%;
+    }
+    .url-group-header .url-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--accent), #ff9e42);
+        border-radius: 2px;
+        transition: width 0.4s ease;
+        min-width: 1px;
+    }
+    .qr-table {
         width: 100%;
         border-collapse: collapse;
-        margin-top: 10px;
     }
-    .analytics-table th {
+    .qr-table th {
         text-align: left;
-        padding: 12px 10px;
-        border-bottom: 2px solid var(--border);
+        padding: 10px 20px;
+        border-bottom: 1px solid var(--border);
         color: #aaa;
         font-weight: 600;
-        font-size: 0.85rem;
+        font-size: 0.8rem;
         text-transform: uppercase;
         letter-spacing: 0.5px;
+        background: rgba(0,0,0,0.15);
     }
-    .analytics-table td {
-        padding: 10px;
-        border-bottom: 1px solid var(--border);
+    .qr-table td {
+        padding: 10px 20px;
+        border-bottom: 1px solid rgba(255,255,255,0.04);
         vertical-align: middle;
     }
-    .analytics-table tr:hover td {
-        background: rgba(255,255,255,0.03);
+    .qr-table tr:last-child td {
+        border-bottom: none;
+    }
+    .qr-table tr:hover td {
+        background: rgba(255,255,255,0.02);
     }
     .bar-cell {
         display: flex;
@@ -59,11 +168,11 @@ include THEME_PATH . '/header.php';
     }
     .bar-bg {
         flex: 1;
-        height: 24px;
+        height: 20px;
         background: #2a2a2a;
         border-radius: 4px;
         overflow: hidden;
-        min-width: 80px;
+        min-width: 60px;
     }
     .bar-fill {
         height: 100%;
@@ -75,21 +184,20 @@ include THEME_PATH . '/header.php';
     .bar-count {
         font-weight: 700;
         color: var(--accent);
-        min-width: 40px;
+        min-width: 30px;
         text-align: right;
-        font-size: 1rem;
+        font-size: 0.95rem;
     }
-    .url-display {
-        word-break: break-all;
+    .qr-title {
+        font-weight: 600;
         color: var(--text);
         font-size: 0.9rem;
     }
-    .url-display a {
-        color: var(--accent);
-        text-decoration: none;
-    }
-    .url-display a:hover {
-        text-decoration: underline;
+    .qr-uuid {
+        color: #666;
+        font-size: 0.75rem;
+        font-family: monospace;
+        margin-top: 2px;
     }
     .stat-meta {
         color: #888;
@@ -104,30 +212,6 @@ include THEME_PATH . '/header.php';
         font-size: 0.8rem;
         margin-left: 4px;
     }
-    .analytics-summary {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 15px;
-        margin-bottom: 25px;
-    }
-    .summary-card {
-        background: var(--card);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 18px 20px;
-    }
-    .summary-card .label {
-        font-size: 0.8rem;
-        color: #888;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    .summary-card .value {
-        font-size: 1.6rem;
-        font-weight: 800;
-        margin-top: 4px;
-        color: var(--accent);
-    }
     .no-data {
         text-align: center;
         color: #666;
@@ -136,79 +220,79 @@ include THEME_PATH . '/header.php';
     }
 </style>
 
-<?php
-// Compute summary stats
-$totalUrls     = count($rows);
-$totalScansAll = array_sum(array_column($rows, 'total_scans'));
-$totalQrs      = array_sum(array_column($rows, 'qr_count'));
-?>
+<p><a href="<?= htmlspecialchars(BASE_URL) ?>/" class="back-link">← Back to Dashboard</a></p>
 
-<div class="analytics-summary">
-    <div class="summary-card">
-        <div class="label">Destination URLs</div>
-        <div class="value"><?= $totalUrls ?></div>
-    </div>
-    <div class="summary-card">
-        <div class="label">Total Scans</div>
-        <div class="value"><?= number_format($totalScansAll) ?></div>
-    </div>
-    <div class="summary-card">
-        <div class="label">QR Codes Tracked</div>
-        <div class="value"><?= number_format($totalQrs) ?></div>
-    </div>
-    <div class="summary-card">
-        <div class="label">Avg Scans / URL</div>
-        <div class="value"><?= $totalUrls ? round($totalScansAll / $totalUrls, 1) : 0 ?></div>
-    </div>
-</div>
-
-<?php if (empty($rows)): ?>
+<?php if (empty($urlGroups)): ?>
     <p class="no-data">No URL-type QR codes have been scanned yet. Create a URL QR code and share it to start collecting data.</p>
 <?php else: ?>
-<div style="overflow-x: auto;">
-    <table class="analytics-table">
-        <thead>
-            <tr>
-                <th style="width:35%;">Destination URL</th>
-                <th style="width:40%;">Scans (bar chart)</th>
-                <th style="width:10%;">QR Codes</th>
-                <th style="width:15%;">Last Scan</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php foreach ($rows as $row):
-                $barPct = $maxScans > 0 ? round(($row['total_scans'] / $maxScans) * 100) : 0;
-            ?>
-            <tr>
-                <td>
-                    <div class="url-display">
-                        <a href="<?= htmlspecialchars($row['target_data']) ?>" target="_blank" rel="noopener">
-                            <?= htmlspecialchars(mb_substr($row['target_data'], 0, 60)) ?>
-                        </a>
-                        <?php if (mb_strlen($row['target_data']) > 60): ?>
-                            <span class="stat-badge" title="<?= htmlspecialchars($row['target_data']) ?>">…</span>
-                        <?php endif; ?>
-                    </div>
-                </td>
-                <td>
-                    <div class="bar-cell">
-                        <div class="bar-bg">
-                            <div class="bar-fill" style="width:<?= $barPct ?>%;"></div>
+    <?php foreach ($urlGroups as $group):
+        $barPct = $maxScans > 0 ? round(($group['total_scans'] / $maxScans) * 100) : 0;
+        $qrs = $qrByUrl[$group['target_data']] ?? [];
+    ?>
+    <div class="url-group">
+        <div class="url-group-header">
+            <div class="url-display">
+                <a href="<?= htmlspecialchars($group['target_data']) ?>" target="_blank" rel="noopener">
+                    <?= htmlspecialchars(mb_substr($group['target_data'], 0, 60)) ?>
+                </a>
+                <?php if (mb_strlen($group['target_data']) > 60): ?>
+                    <span class="stat-badge" title="<?= htmlspecialchars($group['target_data']) ?>">…</span>
+                <?php endif; ?>
+            </div>
+            <div class="url-stats">
+                <div class="url-stat-item">
+                    <div class="num"><?= (int)$group['total_scans'] ?></div>
+                    <div class="lbl">Scans</div>
+                </div>
+                <div class="url-stat-item">
+                    <div class="num"><?= (int)$group['qr_count'] ?></div>
+                    <div class="lbl">QR Codes</div>
+                </div>
+                <div class="url-stat-item">
+                    <div class="num"><?= $group['last_scan'] ? date('M d', strtotime($group['last_scan'])) : '—' ?></div>
+                    <div class="lbl">Last Scan</div>
+                </div>
+            </div>
+            <div class="url-bar-bg">
+                <div class="url-bar-fill" style="width:<?= $barPct ?>%;"></div>
+            </div>
+        </div>
+
+        <?php if (!empty($qrs)): ?>
+        <table class="qr-table">
+            <thead>
+                <tr>
+                    <th style="width:35%;">QR Code</th>
+                    <th style="width:50%;">Scans</th>
+                    <th style="width:15%;">UUID</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($qrs as $qr):
+                    $innerBarPct = $maxQrScans > 0 ? round(($qr['scan_count'] / $maxQrScans) * 100) : 0;
+                ?>
+                <tr>
+                    <td>
+                        <div class="qr-title"><?= htmlspecialchars($qr['title'] ?: 'Untitled QR') ?></div>
+                    </td>
+                    <td>
+                        <div class="bar-cell">
+                            <div class="bar-bg">
+                                <div class="bar-fill" style="width:<?= $innerBarPct ?>%;"></div>
+                            </div>
+                            <span class="bar-count"><?= (int)$qr['scan_count'] ?></span>
                         </div>
-                        <span class="bar-count"><?= (int)$row['total_scans'] ?></span>
-                    </div>
-                </td>
-                <td class="stat-meta"><?= (int)$row['qr_count'] ?> QR<?= $row['qr_count'] != 1 ? 's' : '' ?></td>
-                <td class="stat-meta">
-                    <?= $row['last_scan']
-                        ? date('M d, Y', strtotime($row['last_scan']))
-                        : '<span style="color:#555;">—</span>' ?>
-                </td>
-            </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
-</div>
+                    </td>
+                    <td class="stat-meta">
+                        <span class="qr-uuid"><?= htmlspecialchars(mb_substr($qr['uuid'], 0, 8)) ?>…</span>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+        <?php endif; ?>
+    </div>
+    <?php endforeach; ?>
 <?php endif; ?>
 
 <?php include THEME_PATH . '/footer.php'; ?>
