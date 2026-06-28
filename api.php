@@ -45,8 +45,8 @@ if (API_THROTTLE_ENABLED) {
 }
 
 // --- AUTHENTICATION (header only — no GET fallback) ---
-$headers = getallheaders();
-$authKey = $headers['X-Api-Key'] ?? null;
+$headers = array_change_key_case(getallheaders(), CASE_LOWER);
+$authKey = $headers['x-api-key'] ?? null;
 
 if ($authKey === null || !hash_equals(API_KEY, $authKey)) {
     http_response_code(401);
