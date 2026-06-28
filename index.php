@@ -1,5 +1,52 @@
 <?php
 require 'config.php';
+
+// ── QR CODE REDIRECT HANDLER ─────────────────────────────────────────────
+// If request matches /p/<uuid>, log the scan and redirect to the destination.
+$requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+if (preg_match('#^/p/([a-f0-9]+)$#i', $requestUri, $m)) {
+    $uuid = $m[1];
+
+    // Fetch QR code from DB
+    $stmt = $db->prepare("SELECT * FROM products WHERE uuid = ? AND is_deleted = 0 LIMIT 1");
+    $stmt->execute([$uuid]);
+    $item = $stmt->fetch();
+
+    if (!$item) {
+        http_response_code(404);
+        die('QR code not found.');
+    }
+
+    if (!$item['is_active']) {
+        if (DISABLED_REDIRECT_URL) {
+            header('Location: ' . DISABLED_REDIRECT_URL, true, 302);
+        } else {
+            http_response_code(410);
+            include THEME_PATH . '/qr-disabled.php';
+        }
+        exit;
+    }
+
+    // Log the scan
+    $stmt = $db->prepare("INSERT INTO scans (product_uuid, ip_address, user_agent, scan_status) VALUES (?, ?, ?, 'success')");
+    $stmt->execute([
+        $uuid,
+        $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+        $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
+    ]);
+
+    // Determine destination and redirect
+    if ($item['type'] === 'url') {
+        $dest = $item['target_data'];
+    } else {
+        // For non-URL types, redirect to the base URL (user would need app-based scan)
+        $dest = BASE_URL;
+    }
+
+    header('Location: ' . $dest, true, 302);
+    exit;
+}
+
 require_auth();
 
 define('PAGE_TITLE', 'Dashboard | Tuxxin QR Track');
