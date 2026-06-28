@@ -426,8 +426,13 @@ include THEME_PATH . '/header.php';
     <div class="modal-content" style="text-align: center;">
         <svg class="close-icon" onclick="closeModal('qrModal')" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
         <h2 id="qrTitle">QR Code</h2>
-        <img id="qrImage" src="" style="width: 250px; height: 250px; border: 5px solid white; margin: 20px 0;" alt="QR Code">
-        <div style="display:flex; gap:10px; justify-content:center;">
+                <img id="qrImage" src="" style="width: 250px; height: 250px; border: 5px solid white; margin: 20px 0;" alt="QR Code">
+                <div style="margin: 10px auto; max-width: 400px; text-align: left;">
+                    <label style="font-size: 0.85em; color: #aaa;">Tracking URL (paste into QRCodeMonkey):</label>
+                    <input type="text" id="qrUrl" readonly onclick="this.select(); navigator.clipboard?.writeText(this.value)"
+                           style="width: 100%; padding: 8px; background: #2a2a2a; border: 1px solid #444; color: var(--accent); border-radius: 4px; font-size: 0.85em; cursor: pointer; box-sizing: border-box;">
+                </div>
+                <div style="display:flex; gap:10px; justify-content:center;">
             <a id="dlPng" href="#" download class="btn btn-sm">Download PNG</a>
             <a id="dlJpg" href="#" download class="btn btn-sm">Download JPG</a>
             <button onclick="printQR()" class="btn btn-sm" style="background: #444;">Print</button>
@@ -549,6 +554,7 @@ function showQR(uuid, title) {
     document.getElementById('dlJpg').href         = urlBase + '&format=jpg';
     document.getElementById('dlPng').setAttribute('download', title + '-QR.png');
     document.getElementById('dlJpg').setAttribute('download', title + '-QR.jpg');
+    document.getElementById('qrUrl').value = window.location.origin + '/p/' + uuid;
     openModal('qrModal');
 }
 
