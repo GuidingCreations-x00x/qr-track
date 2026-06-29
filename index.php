@@ -27,13 +27,23 @@ if (preg_match('#^/p/([a-f0-9]+)$#i', $requestUri, $m)) {
         exit;
     }
 
-    // Log the scan
-    $stmt = $db->prepare("INSERT INTO scans (product_uuid, ip_address, user_agent, scan_status) VALUES (?, ?, ?, 'success')");
-    $stmt->execute([
-        $uuid,
-        $_SERVER['REMOTE_ADDR'] ?? 'unknown',
-        $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
-    ]);
+    // ── Scam Protection: skip logging if this device has spammed in the last hour ──
+        $stmt = $db->prepare("SELECT COUNT(*) FROM scans WHERE ip_address = ? AND user_agent = ? AND scanned_at > datetime('now', '-1 hour')");
+        $stmt->execute([
+            $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+            $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
+        ]);
+        $recentCount = (int)$stmt->fetchColumn();
+
+        if ($recentCount < 10) {
+            // Log the scan
+            $stmt = $db->prepare("INSERT INTO scans (product_uuid, ip_address, user_agent, scan_status) VALUES (?, ?, ?, 'success')");
+            $stmt->execute([
+                $uuid,
+                $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+                $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
+            ]);
+        }
 
     // Determine destination and redirect
     if ($item['type'] === 'url') {
