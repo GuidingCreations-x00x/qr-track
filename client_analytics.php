@@ -666,6 +666,13 @@ include THEME_PATH . '/header.php';
         .ca-device-list { flex-direction: column; }
         .ca-table { font-size: 0.85rem; }
     }
+    @media (max-width: 480px) {
+        .ca-pill { font-size: 0.75rem; padding: 4px 10px; }
+        .ca-header h2 { font-size: 1.2rem; }
+        .ca-rank-item { flex-direction: column; align-items: flex-start; }
+        #myChart { max-height: 250px; }
+        .ca-qr-item { flex-direction: column; align-items: flex-start; }
+    }
 
     /* ── QR Management Section ──────────────────────────────────────────── */
     .ca-qr-item {

@@ -75,6 +75,27 @@
         }
 
         .type-fields { display: none; }
+
+        /* ── Mobile Responsive ─────────────────────────────────────────────── */
+        @media (max-width: 480px) {
+            body { padding: 10px; }
+            header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+            .container { padding: 0; }
+            header div[style*="flex"] {
+                width: 100%;
+            }
+            .btn-sm {
+                font-size: 0.7rem;
+                padding: 6px 10px;
+            }
+        }
+        @media (max-width: 600px) {
+            .modal-content { padding: 20px; width: 95%; }
+        }
     </style>
 </head>
 <body>

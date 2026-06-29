@@ -350,6 +350,14 @@ include THEME_PATH . '/header.php';
     .card-view-link:hover {
         opacity: 0.9;
     }
+
+    /* ── Mobile Card Sizing ───────────────────────────────────────────────── */
+    @media (max-width: 480px) {
+        .card-client-stats { flex-direction: column; gap: 8px; }
+        .card-stat-num { font-size: 1.1rem; }
+        .card-client-url { font-size: 0.95rem; }
+        .card-view-link { width: 100%; }
+    }
 </style>
 
 <!-- ── SEARCH BAR ────────────────────────────────────────────────────────────── -->
