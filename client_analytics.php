@@ -6,6 +6,164 @@ header('X-Robots-Tag: noindex, nofollow');
 
 define('PAGE_TITLE', 'Analytics Dashboard | Tracking LaB');
 
+const ALLOWED_TYPES = ['url', 'phone', 'map', 'vcard', 'wifi', 'sms', 'email', 'social'];
+
+// --- HANDLE FORM SUBMISSIONS & ACTIONS ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+
+    verify_csrf();
+
+    // Action: Add New QR Code
+    if ($_POST['action'] === 'add') {
+        $uuid  = bin2hex(random_bytes(6));
+        $title = trim($_POST['title'] ?? '');
+        $type  = $_POST['type'] ?? '';
+
+        if ($title === '' || !in_array($type, ALLOWED_TYPES, true)) {
+            http_response_code(400);
+            die('Invalid input.');
+        }
+
+        // Construct target data based on type
+        $target = '';
+        if ($type === 'vcard') {
+            $target = json_encode([
+                'fname'   => trim($_POST['v_fname']    ?? ''),
+                'lname'   => trim($_POST['v_lname']    ?? ''),
+                'phone'   => trim($_POST['v_phone']    ?? ''),
+                'email'   => trim($_POST['v_email']    ?? ''),
+                'company' => trim($_POST['v_company']  ?? ''),
+            ]);
+        } elseif ($type === 'wifi') {
+            $target = json_encode([
+                'ssid' => trim($_POST['wifi_ssid'] ?? ''),
+                'pass' => trim($_POST['wifi_pass'] ?? ''),
+                'enc'  => trim($_POST['wifi_enc']  ?? 'WPA'),
+            ]);
+        } elseif ($type === 'sms') {
+            $target = json_encode([
+                'phone' => trim($_POST['sms_phone'] ?? ''),
+                'body'  => trim($_POST['sms_body']  ?? ''),
+            ]);
+        } elseif ($type === 'email') {
+            $target = json_encode([
+                'email'   => trim($_POST['email_addr'] ?? ''),
+                'subject' => trim($_POST['email_sub']  ?? ''),
+                'body'    => trim($_POST['email_body'] ?? ''),
+            ]);
+        } else {
+            $target = trim($_POST['target'] ?? '');
+        }
+
+        // Handle logo upload with MIME validation
+        $logoPath = null;
+        if (isset($_FILES['logo']) && $_FILES['logo']['error'] === UPLOAD_ERR_OK) {
+            $allowedMimes = ['image/png' => 'png', 'image/jpeg' => 'jpg'];
+            $finfo        = new finfo(FILEINFO_MIME_TYPE);
+            $mime         = $finfo->file($_FILES['logo']['tmp_name']);
+
+            if (isset($allowedMimes[$mime])) {
+                $ext      = $allowedMimes[$mime];
+                $filename = 'logo_' . $uuid . '.' . $ext;
+                $destPath = LOGO_DIR . '/' . $filename;
+                if (!is_dir(LOGO_DIR)) {
+                    mkdir(LOGO_DIR, 0755, true);
+                }
+                if (move_uploaded_file($_FILES['logo']['tmp_name'], $destPath)) {
+                    $logoPath = $filename;
+                } else {
+                    error_log("File upload error: Unable to move file to " . $destPath);
+                }
+            }
+        }
+
+        $stmt = $db->prepare("INSERT INTO products (uuid, title, type, target_data, logo_path) VALUES (?, ?, ?, ?, ?)");
+        $stmt->execute([$uuid, $title, $type, $target, $logoPath]);
+
+        // Redirect back to same client
+        $clientParam = isset($_POST['client_target']) ? '?client=' . urlencode($_POST['client_target']) : '';
+        header("Location: " . BASE_URL . "/client_analytics.php" . $clientParam);
+        exit;
+    }
+
+    // Action: Edit QR Code
+    if ($_POST['action'] === 'edit') {
+        $id    = (int)($_POST['id'] ?? 0);
+        $title = trim($_POST['title'] ?? '');
+
+        if ($id <= 0 || $title === '') {
+            http_response_code(400);
+            die('Invalid input.');
+        }
+
+        $row = $db->prepare("SELECT type FROM products WHERE id = ? AND is_deleted = 0");
+        $row->execute([$id]);
+        $current = $row->fetch();
+        if (!$current) { http_response_code(404); die('Not found.'); }
+
+        $type = $current['type'];
+        $target = '';
+        if ($type === 'vcard') {
+            $target = json_encode([
+                'fname'   => trim($_POST['v_fname']   ?? ''),
+                'lname'   => trim($_POST['v_lname']   ?? ''),
+                'phone'   => trim($_POST['v_phone']   ?? ''),
+                'email'   => trim($_POST['v_email']   ?? ''),
+                'company' => trim($_POST['v_company'] ?? ''),
+            ]);
+        } elseif ($type === 'wifi') {
+            $target = json_encode([
+                'ssid' => trim($_POST['wifi_ssid'] ?? ''),
+                'pass' => trim($_POST['wifi_pass'] ?? ''),
+                'enc'  => trim($_POST['wifi_enc']  ?? 'WPA'),
+            ]);
+        } elseif ($type === 'sms') {
+            $target = json_encode([
+                'phone' => trim($_POST['sms_phone'] ?? ''),
+                'body'  => trim($_POST['sms_body']  ?? ''),
+            ]);
+        } elseif ($type === 'email') {
+            $target = json_encode([
+                'email'   => trim($_POST['email_addr'] ?? ''),
+                'subject' => trim($_POST['email_sub']  ?? ''),
+                'body'    => trim($_POST['email_body'] ?? ''),
+            ]);
+        } else {
+            $target = trim($_POST['target'] ?? '');
+        }
+
+        $stmt = $db->prepare("UPDATE products SET title = ?, target_data = ? WHERE id = ? AND is_deleted = 0");
+        $stmt->execute([$title, $target, $id]);
+
+        $clientParam = isset($_POST['client_target']) ? '?client=' . urlencode($_POST['client_target']) : '';
+        header("Location: " . BASE_URL . "/client_analytics.php" . $clientParam);
+        exit;
+    }
+
+    // Action: Toggle Active Status
+    if ($_POST['action'] === 'toggle') {
+        $stmt = $db->prepare("UPDATE products SET is_active = NOT is_active WHERE id = ?");
+        $stmt->execute([(int)($_POST['id'] ?? 0)]);
+        exit;
+    }
+
+    // Action: Soft Delete
+    if ($_POST['action'] === 'delete') {
+        $stmt = $db->prepare("UPDATE products SET is_active = 0, is_deleted = 1 WHERE id = ?");
+        $stmt->execute([(int)($_POST['id'] ?? 0)]);
+        exit;
+    }
+
+    // Action: Restore Deleted
+    if ($_POST['action'] === 'restore') {
+        $stmt = $db->prepare("UPDATE products SET is_deleted = 0, is_active = 1 WHERE id = ?");
+        $stmt->execute([(int)($_POST['id'] ?? 0)]);
+        $clientParam = isset($_POST['client_target']) ? '?client=' . urlencode($_POST['client_target']) : '';
+        header("Location: " . BASE_URL . "/client_analytics.php" . $clientParam);
+        exit;
+    }
+}
+
 // ── HELPER: Parse user agent for device type ──────────────────────────────
 function detectDevice(string $ua): string {
     $ua = strtolower($ua);
@@ -36,7 +194,7 @@ if ($selectedClient === '' && !empty($clients)) {
 $qrCodes = [];
 if ($selectedClient) {
     $stmt = $db->prepare("
-        SELECT p.uuid, p.title, p.created_at
+        SELECT p.uuid, p.title, p.created_at, p.id, p.type, p.target_data, p.is_active
         FROM products p
         WHERE p.type = 'url'
           AND p.is_deleted = 0
@@ -508,6 +666,48 @@ include THEME_PATH . '/header.php';
         .ca-device-list { flex-direction: column; }
         .ca-table { font-size: 0.85rem; }
     }
+
+    /* ── QR Management Section ──────────────────────────────────────────── */
+    .ca-qr-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 12px 16px;
+        background: #1a1a1a;
+        border: 1px solid #2a2a2a;
+        border-radius: 6px;
+        transition: border-color 0.2s;
+    }
+    .ca-qr-item:hover {
+        border-color: var(--accent);
+    }
+    .ca-qr-info {
+        flex: 1;
+        min-width: 150px;
+    }
+    .ca-qr-title {
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+    .ca-qr-meta {
+        font-size: 0.8rem;
+        color: #888;
+        margin-top: 2px;
+    }
+    .ca-qr-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .ca-qr-scans {
+        font-weight: 700;
+        color: var(--accent);
+        font-size: 0.85rem;
+        white-space: nowrap;
+    }
 </style>
 
 <div class="ca-header">
@@ -670,6 +870,208 @@ include THEME_PATH . '/header.php';
 
 <?php endif; ?>
 
+<!-- ── QR MANAGEMENT SECTION ────────────────────────────────────────────────── -->
+<?php if (!empty($selectedClient) && !empty($clients)): ?>
+<div class="ca-card ca-qr-mgmt" style="margin-top:20px;">
+    <div class="ca-collapsible-header" onclick="toggleQrSection()">
+        <h3 style="margin:0;">QR Code Management</h3>
+        <span style="display:flex; gap:8px; align-items:center;">
+            <button class="btn btn-sm" onclick="event.stopPropagation(); openAddModalForClient('<?= htmlspecialchars($selectedClient, ENT_QUOTES) ?>')">+ New QR Code</button>
+            <span class="ca-collapsible-toggle" id="qrToggle">Show</span>
+        </span>
+    </div>
+    <div class="ca-collapsible-body" id="qrSection">
+        <?php if (empty($qrCodes)): ?>
+        <div class="ca-placeholder" style="margin-top:15px;">
+            No QR codes for this client yet.
+            <br><button class="btn btn-sm" style="margin-top:10px;" onclick="openAddModalForClient('<?= htmlspecialchars($selectedClient, ENT_QUOTES) ?>')">+ Add the First QR Code</button>
+        </div>
+        <?php else: ?>
+        <div style="margin-top:15px; display:flex; flex-direction:column; gap:8px;">
+            <?php foreach ($qrCodes as $qr):
+                // Get scan count for this QR
+                $stmtS = $db->prepare("SELECT COUNT(*) AS cnt FROM scans WHERE product_uuid = ?");
+                $stmtS->execute([$qr['uuid']]);
+                $scanCnt = (int)$stmtS->fetch()['cnt'];
+            ?>
+            <div class="ca-qr-item" data-uuid="<?= htmlspecialchars($qr['uuid']) ?>">
+                <div class="ca-qr-info">
+                    <div class="ca-qr-title"><?= htmlspecialchars($qr['title'] ?: 'Untitled QR') ?></div>
+                    <div class="ca-qr-meta">UUID: <?= htmlspecialchars(mb_substr($qr['uuid'], 0, 8)) ?>&hellip; &middot; Created: <?= date('M d, Y', strtotime($qr['created_at'])) ?></div>
+                </div>
+                <div class="ca-qr-actions">
+                    <span class="ca-qr-scans"><?= $scanCnt ?> scan<?= $scanCnt !== 1 ? 's' : '' ?></span>
+                    <label class="switch">
+                        <input type="checkbox" onchange="caToggleQR(<?= (int)$qr['id'] ?>, '<?= htmlspecialchars(csrf_token(), ENT_QUOTES) ?>')" <?= $qr['is_active'] ? 'checked' : '' ?>>
+                        <span class="slider"></span>
+                    </label>
+                    <button class="btn btn-sm" onclick="caShowQR('<?= htmlspecialchars($qr['uuid']) ?>', <?= htmlspecialchars(json_encode($qr['title'] ?: 'Untitled QR'), ENT_QUOTES) ?>)">Get Code</button>
+                    <button class="btn btn-sm btn-info" onclick='caOpenEditModal(<?= htmlspecialchars(json_encode([
+                        'id'          => $qr['id'],
+                        'title'       => $qr['title'],
+                        'type'        => $qr['type'],
+                        'target_data' => $qr['target_data'],
+                    ]), ENT_QUOTES) ?>)' title="Edit">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
+                        </svg>
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="caConfirmDelete(<?= (int)$qr['id'] ?>)" title="Delete" style="display:flex; align-items:center; padding:8px;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                            <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+<?php endif; ?>
+
+<!-- ── Add Modal ──────────────────────────────────────────────────────────────── -->
+<div id="caAddModal" class="modal">
+    <div class="modal-content">
+        <svg class="close-icon" onclick="closeModal('caAddModal')" viewBox="0 0 24 24">
+            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+        </svg>
+        <h2>Add QR Code</h2>
+        <p style="color:#888;">Client: <strong id="caAddClientLabel" style="color:var(--accent);"></strong></p>
+        <form method="POST" enctype="multipart/form-data" action="<?= htmlspecialchars(BASE_URL) ?>/client_analytics.php?client=<?= urlencode($selectedClient) ?>">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
+            <input type="hidden" name="action" value="add">
+            <input type="hidden" name="client_target" id="caAddClientTarget" value="<?= htmlspecialchars($selectedClient) ?>">
+            <label>Title</label>
+            <input type="text" name="title" required placeholder="Product Name" maxlength="255">
+            <label>Type</label>
+            <select name="type" id="caTypeSelect" onchange="caToggleFields()">
+                <option value="url">Website URL</option>
+                <option value="phone">Phone Number</option>
+                <option value="map">Map Location</option>
+                <option value="vcard">vCard Contact</option>
+                <option value="wifi">Wi-Fi Network</option>
+                <option value="sms">SMS Message</option>
+                <option value="email">Email Message</option>
+                <option value="social">Social Media</option>
+            </select>
+
+            <div id="ca-field-general" class="type-fields" style="display:block;">
+                <label>Target URL</label>
+                <input type="text" name="target" id="caTargetField" placeholder="https://example.com" maxlength="2048">
+            </div>
+            <div id="ca-field-vcard" class="type-fields">
+                <input type="text" name="v_fname" placeholder="First Name" maxlength="100">
+                <input type="text" name="v_lname" placeholder="Last Name" maxlength="100">
+                <input type="text" name="v_phone" placeholder="Phone" maxlength="30">
+                <input type="email" name="v_email" placeholder="Email" maxlength="255">
+                <input type="text" name="v_company" placeholder="Company" maxlength="255">
+            </div>
+            <div id="ca-field-wifi" class="type-fields">
+                <input type="text" name="wifi_ssid" placeholder="Network Name (SSID)" maxlength="32">
+                <input type="text" name="wifi_pass" placeholder="Password" maxlength="63">
+                <select name="wifi_enc"><option value="WPA">WPA/WPA2</option><option value="WEP">WEP</option><option value="nopass">No Encryption</option></select>
+            </div>
+            <div id="ca-field-sms" class="type-fields">
+                <input type="tel" name="sms_phone" placeholder="Phone Number" maxlength="30">
+                <textarea name="sms_body" placeholder="Message Body" maxlength="1000"></textarea>
+            </div>
+            <div id="ca-field-email" class="type-fields">
+                <input type="email" name="email_addr" placeholder="Recipient" maxlength="255">
+                <input type="text" name="email_sub" placeholder="Subject" maxlength="255">
+                <textarea name="email_body" placeholder="Body" maxlength="2000"></textarea>
+            </div>
+
+            <label>Embedded Logo (Optional — PNG or JPG only)</label>
+            <input type="file" name="logo" accept="image/png, image/jpeg">
+            <button type="submit" class="btn" style="width:100%; margin-top:20px;">Generate QR</button>
+        </form>
+    </div>
+</div>
+
+<!-- ── Edit Modal ─────────────────────────────────────────────────────────────── -->
+<div id="caEditModal" class="modal">
+    <div class="modal-content">
+        <svg class="close-icon" onclick="closeModal('caEditModal')" viewBox="0 0 24 24">
+            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+        </svg>
+        <h2>Edit QR Code <span id="caEditTypeLabel" style="font-size:0.65em; opacity:0.5; font-weight:normal;"></span></h2>
+        <form method="POST" id="caEditForm" action="<?= htmlspecialchars(BASE_URL) ?>/client_analytics.php?client=<?= urlencode($selectedClient) ?>">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
+            <input type="hidden" name="action" value="edit">
+            <input type="hidden" name="id" id="caEditId">
+            <input type="hidden" name="client_target" value="<?= htmlspecialchars($selectedClient) ?>">
+            <label>Title</label>
+            <input type="text" name="title" id="caEditTitle" required maxlength="255">
+
+            <div id="ca-edit-field-general" class="type-fields" style="display:none;">
+                <label id="caEditGeneralLabel">Target</label>
+                <input type="text" name="target" id="caEditTarget" maxlength="2048">
+            </div>
+            <div id="ca-edit-field-vcard" class="type-fields" style="display:none;">
+                <input type="text" name="v_fname" id="caEditFname" placeholder="First Name" maxlength="100">
+                <input type="text" name="v_lname" id="caEditLname" placeholder="Last Name" maxlength="100">
+                <input type="text" name="v_phone" id="caEditVphone" placeholder="Phone" maxlength="30">
+                <input type="email" name="v_email" id="caEditVemail" placeholder="Email" maxlength="255">
+                <input type="text" name="v_company" id="caEditVcompany" placeholder="Company" maxlength="255">
+            </div>
+            <div id="ca-edit-field-wifi" class="type-fields" style="display:none;">
+                <input type="text" name="wifi_ssid" id="caEditSsid" placeholder="Network Name (SSID)" maxlength="32">
+                <input type="text" name="wifi_pass" id="caEditPass" placeholder="Password" maxlength="63">
+                <select name="wifi_enc" id="caEditEnc">
+                    <option value="WPA">WPA/WPA2</option>
+                    <option value="WEP">WEP</option>
+                    <option value="nopass">No Encryption</option>
+                </select>
+            </div>
+            <div id="ca-edit-field-sms" class="type-fields" style="display:none;">
+                <input type="tel" name="sms_phone" id="caEditSmsPhone" placeholder="Phone Number" maxlength="30">
+                <textarea name="sms_body" id="caEditSmsBody" placeholder="Message Body" maxlength="1000"></textarea>
+            </div>
+            <div id="ca-edit-field-email" class="type-fields" style="display:none;">
+                <input type="email" name="email_addr" id="caEditEmailAddr" placeholder="Recipient" maxlength="255">
+                <input type="text" name="email_sub" id="caEditEmailSub" placeholder="Subject" maxlength="255">
+                <textarea name="email_body" id="caEditEmailBody" placeholder="Body" maxlength="2000"></textarea>
+            </div>
+
+            <button type="submit" class="btn" style="width:100%; margin-top:20px;">Save Changes</button>
+        </form>
+    </div>
+</div>
+
+<!-- ── QR Code Modal ──────────────────────────────────────────────────────────── -->
+<div id="caQrModal" class="modal">
+    <div class="modal-content" style="text-align: center;">
+        <svg class="close-icon" onclick="closeModal('caQrModal')" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        <h2 id="caQrTitle">QR Code</h2>
+        <img id="caQrImage" src="" style="width: 250px; height: 250px; border: 5px solid white; margin: 20px 0;" alt="QR Code">
+        <div style="margin: 10px auto; max-width: 400px; text-align: left;">
+            <label style="font-size: 0.85em; color: #aaa;">Tracking URL (paste into QRCodeMonkey):</label>
+            <input type="text" id="caQrUrl" readonly onclick="this.select(); navigator.clipboard?.writeText(this.value)"
+                   style="width: 100%; padding: 8px; background: #2a2a2a; border: 1px solid #444; color: var(--accent); border-radius: 4px; font-size: 0.85em; cursor: pointer; box-sizing: border-box;">
+        </div>
+        <div style="display:flex; gap:10px; justify-content:center;">
+            <a id="caDlPng" href="#" download class="btn btn-sm">Download PNG</a>
+            <a id="caDlJpg" href="#" download class="btn btn-sm">Download JPG</a>
+            <button onclick="caPrintQR()" class="btn btn-sm" style="background: #444;">Print</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Delete Confirm Modal ───────────────────────────────────────────────────── -->
+<div id="caDeleteModal" class="modal">
+    <div class="modal-content" style="text-align: center;">
+        <svg class="close-icon" onclick="closeModal('caDeleteModal')" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        <h2>Are you sure?</h2>
+        <p>This will move the QR code to Trash. You can restore it later.</p>
+        <div style="margin-top: 20px; display:flex; gap:10px; justify-content:center;">
+            <button id="caConfirmDeleteBtn" class="btn btn-danger">Yes, Delete</button>
+            <button onclick="closeModal('caDeleteModal')" class="btn" style="background: #444;">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 // ── Collapsible Device Section ──────────────────────────────────────────────
@@ -745,6 +1147,130 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 <?php endif; ?>
+
+// ── QR Management Functions ─────────────────────────────────────────────────
+function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+window.addEventListener('click', function(e) {
+    if (e.target.classList.contains('modal')) e.target.style.display = 'none';
+});
+
+function toggleQrSection() {
+    const body = document.getElementById('qrSection');
+    const toggle = document.getElementById('qrToggle');
+    body.classList.toggle('open');
+    toggle.textContent = body.classList.contains('open') ? 'Hide' : 'Show';
+}
+
+function openAddModalForClient(clientUrl) {
+    document.getElementById('caAddClientLabel').textContent = clientUrl;
+    document.getElementById('caAddClientTarget').value = clientUrl;
+    document.getElementById('caTargetField').value = clientUrl;
+    document.getElementById('caTypeSelect').value = 'url';
+    caToggleFields();
+    document.getElementById('caAddModal').style.display = 'flex';
+}
+
+function caToggleFields() {
+    document.querySelectorAll('#caAddModal .type-fields').forEach(e => e.style.display = 'none');
+    const type = document.getElementById('caTypeSelect').value;
+    const generalInput = document.querySelector('#ca-field-general input');
+    if (['vcard','wifi','sms','email'].includes(type)) {
+        document.getElementById('ca-field-' + type).style.display = 'block';
+    } else {
+        document.getElementById('ca-field-general').style.display = 'block';
+        generalInput.type = (type === 'url' || type === 'social') ? 'url' : 'text';
+        if (type === 'phone')      generalInput.placeholder = '+155****0000';
+        else if (type === 'map')   generalInput.placeholder = '123 Main St, City, ST';
+        else                       generalInput.placeholder = 'https://...';
+    }
+}
+
+function caPrintQR() {
+    const win = window.open('');
+    win.document.write('<html><body style="text-align:center;"><h2 style="font-family:sans-serif">' +
+        document.getElementById('caQrTitle').innerText +
+        '</h2><img src="' + document.getElementById('caQrImage').src +
+        '" onload="window.print();window.close()" /></body></html>');
+    win.document.close();
+}
+
+function caShowQR(uuid, title) {
+    const urlBase = 'generate_image.php?id=' + uuid;
+    document.getElementById('caQrImage').src        = urlBase + '&format=jpg';
+    document.getElementById('caQrTitle').innerText  = title;
+    document.getElementById('caDlPng').href         = urlBase + '&format=png';
+    document.getElementById('caDlJpg').href         = urlBase + '&format=jpg';
+    document.getElementById('caDlPng').setAttribute('download', title + '-QR.png');
+    document.getElementById('caDlJpg').setAttribute('download', title + '-QR.jpg');
+    document.getElementById('caQrUrl').value = window.location.origin + '/p/' + uuid;
+    document.getElementById('caQrModal').style.display = 'flex';
+}
+
+function caToggleQR(id, csrf) {
+    const fd = new FormData();
+    fd.append('action', 'toggle');
+    fd.append('id', id);
+    fd.append('csrf_token', csrf);
+    fetch(window.location.href, { method: 'POST', body: fd });
+}
+
+function caOpenEditModal(data) {
+    document.querySelectorAll('#caEditModal .type-fields').forEach(e => e.style.display = 'none');
+    document.getElementById('caEditId').value    = data.id;
+    document.getElementById('caEditTitle').value = data.title;
+    document.getElementById('caEditTypeLabel').textContent = '[' + data.type.toUpperCase() + ']';
+
+    const type = data.type;
+    let target = data.target_data;
+    let parsed = null;
+    try { parsed = JSON.parse(target); } catch(e) {}
+
+    if (type === 'vcard' && parsed) {
+        document.getElementById('ca-edit-field-vcard').style.display = 'block';
+        document.getElementById('caEditFname').value    = parsed.fname    || '';
+        document.getElementById('caEditLname').value    = parsed.lname    || '';
+        document.getElementById('caEditVphone').value   = parsed.phone    || '';
+        document.getElementById('caEditVemail').value   = parsed.email    || '';
+        document.getElementById('caEditVcompany').value = parsed.company  || '';
+    } else if (type === 'wifi' && parsed) {
+        document.getElementById('ca-edit-field-wifi').style.display = 'block';
+        document.getElementById('caEditSsid').value = parsed.ssid || '';
+        document.getElementById('caEditPass').value = parsed.pass || '';
+        const encSel = document.getElementById('caEditEnc');
+        for (let opt of encSel.options) { if (opt.value === parsed.enc) { opt.selected = true; break; } }
+    } else if (type === 'sms' && parsed) {
+        document.getElementById('ca-edit-field-sms').style.display = 'block';
+        document.getElementById('caEditSmsPhone').value = parsed.phone || '';
+        document.getElementById('caEditSmsBody').value  = parsed.body  || '';
+    } else if (type === 'email' && parsed) {
+        document.getElementById('ca-edit-field-email').style.display = 'block';
+        document.getElementById('caEditEmailAddr').value = parsed.email   || '';
+        document.getElementById('caEditEmailSub').value  = parsed.subject || '';
+        document.getElementById('caEditEmailBody').value = parsed.body    || '';
+    } else {
+        document.getElementById('ca-edit-field-general').style.display = 'block';
+        const lbl = { url:'Target URL', phone:'Phone Number', map:'Map Address', social:'Profile URL' };
+        document.getElementById('caEditGeneralLabel').textContent = lbl[type] || 'Target';
+        document.getElementById('caEditTarget').value = target;
+    }
+
+    document.getElementById('caEditModal').style.display = 'flex';
+}
+
+let caDeleteId = null;
+function caConfirmDelete(id) { caDeleteId = id; document.getElementById('caDeleteModal').style.display = 'flex'; }
+document.addEventListener('DOMContentLoaded', function() {
+    const btn = document.getElementById('caConfirmDeleteBtn');
+    if (btn) {
+        btn.addEventListener('click', function() {
+            const fd = new FormData();
+            fd.append('action', 'delete');
+            fd.append('id', caDeleteId);
+            fd.append('csrf_token', '<?= htmlspecialchars(csrf_token()) ?>');
+            fetch(window.location.href, { method: 'POST', body: fd }).then(() => location.reload());
+        });
+    }
+});
 </script>
 
 <?php include THEME_PATH . '/footer.php'; ?>

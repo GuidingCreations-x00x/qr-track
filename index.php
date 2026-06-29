@@ -235,84 +235,205 @@ if ($showTrash) {
     ")->fetchAll();
 }
 
+// ── URL GROUP STATS FOR CARDS VIEW (non-trash only) ─────────────────────────
+$urlGroups = [];
+$maxGroupScans = 0;
+if (!$showTrash) {
+    $stmt = $db->query("
+        SELECT
+            p.target_data,
+            COUNT(DISTINCT p.uuid) AS qr_count,
+            COUNT(s.id)            AS total_scans,
+            MAX(s.scanned_at)      AS last_scan
+        FROM products p
+        LEFT JOIN scans s ON p.uuid = s.product_uuid
+        WHERE p.type = 'url'
+          AND p.is_deleted = 0
+          AND p.target_data != ''
+        GROUP BY p.target_data
+        ORDER BY total_scans DESC, p.target_data ASC
+    ");
+    $urlGroups = $stmt->fetchAll();
+    $maxGroupScans = $urlGroups ? max(array_column($urlGroups, 'total_scans')) : 0;
+}
+
 $csrfToken = csrf_token();
 
 // --- RENDER VIEW ---
 define('SHOW_ADD_BTN', true);
 include THEME_PATH . '/header.php';
 ?>
+<style>
+    /* ── Dashboard Client Cards ─────────────────────────────────────────── */
+    .dashboard-cards {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    @media (min-width: 768px) {
+        .dashboard-cards {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+    .card-client {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        transition: transform 0.2s, border-color 0.2s;
+        overflow: hidden;
+    }
+    .card-client:hover {
+        transform: translateY(-2px);
+        border-color: var(--accent);
+    }
+    .card-client-body {
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .card-client-url {
+        font-weight: 700;
+        font-size: 1.1rem;
+        word-break: break-all;
+        color: var(--accent);
+    }
+    .card-client-stats {
+        display: flex;
+        gap: 20px;
+    }
+    .card-stat {
+        text-align: center;
+    }
+    .card-stat-num {
+        font-size: 1.4rem;
+        font-weight: 800;
+        color: var(--text);
+        display: block;
+    }
+    .card-stat-lbl {
+        font-size: 0.7rem;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+    .card-bar {
+        width: 100%;
+        height: 6px;
+        background: #2a2a2a;
+        border-radius: 3px;
+        overflow: hidden;
+    }
+    .card-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, var(--accent), #ff9e42);
+        border-radius: 3px;
+        transition: width 0.4s ease;
+        min-width: 1px;
+    }
+    .card-client-meta {
+        font-size: 0.85rem;
+        color: #888;
+    }
+    .card-view-link {
+        display: inline-block;
+        padding: 8px 16px;
+        background: var(--accent);
+        color: #fff;
+        text-decoration: none;
+        border-radius: 5px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        text-align: center;
+        transition: opacity 0.2s;
+    }
+    .card-view-link:hover {
+        opacity: 0.9;
+    }
+</style>
+
+<!-- ── SEARCH BAR ────────────────────────────────────────────────────────────── -->
+<?php if (!$showTrash): ?>
+<div style="margin-bottom:20px;">
+    <input type="text" id="clientSearch" onkeyup="filterCards()" placeholder="&#128269; Search clients or target URLs..." style="width:100%; padding:14px 18px; background:#1a1a1a; border:1px solid #333; border-radius:8px; color:var(--text); font-size:1rem; box-sizing:border-box;">
+</div>
+<?php endif; ?>
 
 <?php if ($showTrash): ?>
 <div style="margin-bottom:15px; display:flex; align-items:center; gap:15px;">
     <a href="<?= htmlspecialchars(BASE_URL) ?>" class="btn btn-sm" style="background:#444;">&larr; Back to Dashboard</a>
     <h2 style="margin:0; color:#ff4444;">Trash</h2>
 </div>
-<?php else: ?>
-<div style="margin-bottom:15px; display:flex; justify-content:flex-end;">
-    <a href="?trash" class="btn btn-sm" style="background:#444;" title="View deleted QR codes">&#128465; Trash</a>
-</div>
-<?php endif; ?>
 
 <div class="qr-list">
     <?php if (empty($products)): ?>
-        <p style="text-align:center; color:#666; padding:40px 0;">
-            <?= $showTrash ? 'Trash is empty.' : 'No QR codes yet. Click "+ New QR Code" to create one.' ?>
-        </p>
+        <p style="text-align:center; color:#666; padding:40px 0;">Trash is empty.</p>
     <?php endif; ?>
-
     <?php foreach($products as $p): ?>
     <div class="qr-item">
         <div class="qr-info">
             <h3><?= htmlspecialchars($p['title']) ?> <span style="font-size:0.7em; opacity:0.6">[<?= strtoupper(htmlspecialchars($p['type'])) ?>]</span></h3>
             <div class="qr-meta">Created: <?= date('M d, Y', strtotime($p['created_at'])) ?></div>
         </div>
-
-        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
-
-            <?php if ($showTrash): ?>
-                <form method="POST" style="margin:0;">
-                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
-                    <input type="hidden" name="action" value="restore">
-                    <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
-                    <button type="submit" class="btn btn-sm" style="background:#28a745;">Restore</button>
-                </form>
-            <?php else: ?>
-                <?php if ($p['type'] === 'wifi'): ?>
-                    <div class="qr-stats" style="color: #666; text-decoration: none; cursor: default;">Not Trackable</div>
-                <?php else: ?>
-                    <div onclick="loadStats('<?= htmlspecialchars($p['uuid']) ?>')" class="qr-stats"><?= (int)$p['scan_count'] ?> Scans</div>
-                <?php endif; ?>
-
-                <label class="switch">
-                    <input type="checkbox" onchange="toggleQR(<?= (int)$p['id'] ?>, '<?= htmlspecialchars($csrfToken) ?>')" <?= $p['is_active'] ? 'checked' : '' ?>>
-                    <span class="slider"></span>
-                </label>
-
-                <button class="btn btn-sm" onclick="showQR('<?= htmlspecialchars($p['uuid']) ?>', <?= htmlspecialchars(json_encode($p['title']), ENT_QUOTES) ?>)">Get Code</button>
-
-                <button class="btn btn-sm btn-info" onclick='openEditModal(<?= htmlspecialchars(json_encode([
-                    'id'          => $p['id'],
-                    'title'       => $p['title'],
-                    'type'        => $p['type'],
-                    'target_data' => $p['target_data'],
-                ]), ENT_QUOTES) ?>)' title="Edit">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-                        <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
-                    </svg>
-                </button>
-
-                <button class="btn btn-sm btn-danger" onclick="confirmDelete(<?= (int)$p['id'] ?>)" title="Delete" style="display:flex; align-items:center; padding: 8px;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-                        <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
-                        <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
-                    </svg>
-                </button>
-            <?php endif; ?>
-
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <form method="POST" style="margin:0;">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken) ?>">
+                <input type="hidden" name="action" value="restore">
+                <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
+                <button type="submit" class="btn btn-sm" style="background:#28a745;">Restore</button>
+            </form>
         </div>
     </div>
     <?php endforeach; ?>
 </div>
+<?php else: ?>
+
+<!-- ── HEADER ACTION BAR ─────────────────────────────────────────────────────── -->
+<div style="margin-bottom:15px; display:flex; justify-content:flex-end; align-items:center;">
+    <a href="?trash" class="btn btn-sm" style="background:#444;" title="View deleted QR codes">&#128465; Trash (<?= (int)$db->query("SELECT COUNT(*) FROM products WHERE is_deleted = 1")->fetchColumn() ?>)</a>
+</div>
+
+<!-- ── URL GROUP CARDS ───────────────────────────────────────────────────────── -->
+<div class="dashboard-cards" id="cardGrid">
+    <?php if (empty($urlGroups)): ?>
+        <p style="text-align:center; color:#666; padding:40px 0; grid-column:1/-1;">
+            No QR codes yet. Click "+ New QR Code" to create one.
+        </p>
+    <?php endif; ?>
+
+    <?php foreach ($urlGroups as $group):
+        $barPct = $maxGroupScans > 0 ? round(($group['total_scans'] / $maxGroupScans) * 100) : 0;
+        $displayName = parse_url($group['target_data'], PHP_URL_HOST) ?: $group['target_data'];
+        $isActive = (bool)$group['total_scans'];
+    ?>
+    <div class="card-client" data-search="<?= htmlspecialchars(strtolower($displayName . ' ' . $group['target_data'])) ?>">
+        <div class="card-client-body">
+            <div class="card-client-url"><?= htmlspecialchars(mb_substr($displayName, 0, 60)) ?></div>
+            <div class="card-client-stats">
+                <div class="card-stat">
+                    <span class="card-stat-num"><?= (int)$group['qr_count'] ?></span>
+                    <span class="card-stat-lbl">QR codes</span>
+                </div>
+                <div class="card-stat">
+                    <span class="card-stat-num"><?= (int)$group['total_scans'] ?></span>
+                    <span class="card-stat-lbl">scans</span>
+                </div>
+            </div>
+            <div class="card-bar">
+                <div class="card-bar-fill" style="width:<?= $barPct ?>%;"></div>
+            </div>
+            <div class="card-client-meta">
+                Last scan: <?= $group['last_scan'] ? date('M d', strtotime($group['last_scan'])) : 'Never' ?>
+            </div>
+            <a href="<?= htmlspecialchars(BASE_URL) ?>/client_analytics.php?client=<?= urlencode($group['target_data']) ?>" class="card-view-link">
+                View Analytics &rarr;
+            </a>
+        </div>
+    </div>
+    <?php endforeach; ?>
+</div>
+
+<?php endif; ?>
 
 <!-- ── Add Modal ──────────────────────────────────────────────────────────────── -->
 <div id="addModal" class="modal">
@@ -465,6 +586,16 @@ include THEME_PATH . '/header.php';
 
 <script>
 const CSRF_TOKEN = <?= json_encode($csrfToken) ?>;
+
+// ── Client card search filter ─────────────────────────────────────────────
+function filterCards() {
+    const query = document.getElementById('clientSearch').value.toLowerCase().trim();
+    const cards = document.querySelectorAll('.card-client');
+    cards.forEach(card => {
+        const searchData = card.getAttribute('data-search') || '';
+        card.style.display = (!query || searchData.includes(query)) ? '' : 'none';
+    });
+}
 
 // ── Modal utilities ──────────────────────────────────────────────────────────
 function openModal(id)  { document.getElementById(id).style.display = 'flex'; }
