@@ -104,8 +104,8 @@
         <div class="header-brand">
             <img src="<?= htmlspecialchars(BASE_URL) ?>/assets/logo.svg" alt="Tracking LaB" class="logo-img" style="height: 55px;">
                         <div>
-                            <h1>Tracking La<b style="background:none;-webkit-text-fill-color:initial;color:var(--accent);">B</b></h1>
-                            <small style="color: #666;">Self-Hosted QR Code Tracking</small>
+                            <h1>Tracking LaB</h1>
+                                                        <small style="color: #666;">Small Business QR Code Tracking</small>
             </div>
         </div>
 
