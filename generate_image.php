@@ -4,6 +4,7 @@ require 'config.php';
 
 use chillerlan\QRCode\QRCode;
 use chillerlan\QRCode\QROptions;
+use chillerlan\QRCode\Data\QRMatrix;
 
 // --- SECURITY CHECK ---
 // 1. Start Session to check if Admin is logged in
@@ -53,15 +54,67 @@ if ($item['type'] === 'wifi') {
     $qrContent = BASE_URL . "/p/" . $uuid;
 }
 
+// --- HELPER: hex color to RGB array ---
+function hexToRGB(string $hex): array {
+    $hex = ltrim($hex, '#');
+    if (strlen($hex) === 3) {
+        $hex = $hex[0].$hex[0].$hex[1].$hex[1].$hex[2].$hex[2];
+    }
+    return [hexdec(substr($hex, 0, 2)), hexdec(substr($hex, 2, 2)), hexdec(substr($hex, 4, 2))];
+}
+
 // --- GENERATION ---
-$options = new QROptions([
-    'version'    => 7, 
+// Read design options from DB (may be null for legacy records)
+$dotModules  = (int)($item['dot_modules'] ?? 0);
+$logoFrame   = (int)($item['logo_frame'] ?? 0);
+$colorBody   = $item['color_body'] ?? '#000000';
+$colorFinders = $item['color_finders'] ?? '#000000';
+$colorBg     = $item['color_bg'] ?? '#ffffff';
+
+$optionsArray = [
+    'version'    => 7,
     'outputType' => $format === 'png' ? QRCode::OUTPUT_IMAGE_PNG : QRCode::OUTPUT_IMAGE_JPG,
     'eccLevel'   => QRCode::ECC_H,
     'scale'      => 10,
     'imageBase64' => false,
     'imageTransparent' => ($format === 'png'),
-]);
+];
+
+// --- Apply design options ---
+if ($dotModules) {
+    $optionsArray['drawCircularModules'] = true;
+    $optionsArray['circleRadius'] = 0.45;
+    $optionsArray['keepAsSquare'] = [QRMatrix::M_FINDER, QRMatrix::M_FINDER_DARK, QRMatrix::M_FINDER_DOT];
+}
+
+// Per-part colors via moduleValues (GD output needs [R,G,B] arrays)
+$moduleValues = [];
+
+if ($colorBody !== '#000000' || $colorFinders !== '#000000') {
+    $bodyRGB = hexToRGB($colorBody);
+    $finderRGB = hexToRGB($colorFinders);
+
+    // Data modules
+    $moduleValues[QRMatrix::M_DATA_DARK] = $bodyRGB;
+    $moduleValues[QRMatrix::M_DATA] = $bodyRGB;
+
+    // Finder pattern modules
+    $moduleValues[QRMatrix::M_FINDER_DARK] = $finderRGB;
+    $moduleValues[QRMatrix::M_FINDER_DOT] = $finderRGB;
+    $moduleValues[QRMatrix::M_ALIGNMENT_DARK] = $finderRGB;
+    $moduleValues[QRMatrix::M_ALIGNMENT] = $finderRGB;
+}
+
+if (!empty($moduleValues)) {
+    $optionsArray['moduleValues'] = $moduleValues;
+}
+
+// Background color override (non-transparent areas)
+if ($colorBg !== '#ffffff') {
+    $optionsArray['bgColor'] = hexToRGB($colorBg);
+}
+
+$options = new QROptions($optionsArray);
 
 $qrcode = new QRCode($options);
 $qrImage = $qrcode->render($qrContent);
@@ -84,6 +137,15 @@ if ($logoPath) {
         $logo_qr_width = $QR_width / 5;
         $scale = $logo_width / $logo_qr_width;
         $logo_qr_height = $logo_height / $scale;
+
+        // --- Logo frame: white circle behind logo ---
+        if ($logoFrame) {
+            $centerX = (int)($QR_width / 2);
+            $centerY = (int)($QR_height / 2);
+            $circleDiam = (int)($logo_qr_width * 1.4);
+            $white = imagecolorallocate($src, 255, 255, 255);
+            imagefilledellipse($src, $centerX, $centerY, $circleDiam, $circleDiam, $white);
+        }
         
         imagecopyresampled($src, $logo, 
             (int)(($QR_width - $logo_qr_width) / 2), 

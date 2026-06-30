@@ -118,6 +118,16 @@ try {
         $db->exec("ALTER TABLE scans ADD COLUMN geo_isp TEXT");
     }
 
+    // Migration: add design option columns if missing
+    $columns = $db->query("PRAGMA table_info(products)")->fetchAll(PDO::FETCH_COLUMN, 1);
+    if (!in_array('dot_modules', $columns)) {
+        $db->exec("ALTER TABLE products ADD COLUMN dot_modules INTEGER DEFAULT 0");
+        $db->exec("ALTER TABLE products ADD COLUMN logo_frame INTEGER DEFAULT 0");
+        $db->exec("ALTER TABLE products ADD COLUMN color_body TEXT DEFAULT '#000000'");
+        $db->exec("ALTER TABLE products ADD COLUMN color_finders TEXT DEFAULT '#000000'");
+        $db->exec("ALTER TABLE products ADD COLUMN color_bg TEXT DEFAULT '#ffffff'");
+    }
+
     $db->exec("CREATE TABLE IF NOT EXISTS api_tokens (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         token TEXT UNIQUE,

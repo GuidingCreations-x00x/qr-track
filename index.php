@@ -132,8 +132,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             }
         }
 
-        $stmt = $db->prepare("INSERT INTO products (uuid, title, type, target_data, logo_path) VALUES (?, ?, ?, ?, ?)");
-        $stmt->execute([$uuid, $title, $type, $target, $logoPath]);
+        $stmt = $db->prepare("INSERT INTO products (uuid, title, type, target_data, logo_path, dot_modules, logo_frame, color_body, color_finders, color_bg) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$uuid, $title, $type, $target, $logoPath,
+            (int)($_POST['dot_modules'] ?? 0),
+            (int)($_POST['logo_frame'] ?? 0),
+            $_POST['color_body'] ?? '#000000',
+            $_POST['color_finders'] ?? '#000000',
+            $_POST['color_bg'] ?? '#ffffff',
+        ]);
 
         header("Location: " . BASE_URL);
         exit;
@@ -186,8 +192,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $target = trim($_POST['target'] ?? '');
         }
 
-        $stmt = $db->prepare("UPDATE products SET title = ?, target_data = ? WHERE id = ? AND is_deleted = 0");
-        $stmt->execute([$title, $target, $id]);
+        $stmt = $db->prepare("UPDATE products SET title = ?, target_data = ?, dot_modules = ?, logo_frame = ?, color_body = ?, color_finders = ?, color_bg = ? WHERE id = ? AND is_deleted = 0");
+        $stmt->execute([$title, $target,
+            (int)($_POST['dot_modules'] ?? 0),
+            (int)($_POST['logo_frame'] ?? 0),
+            $_POST['color_body'] ?? '#000000',
+            $_POST['color_finders'] ?? '#000000',
+            $_POST['color_bg'] ?? '#ffffff',
+            $id,
+        ]);
 
         header("Location: " . BASE_URL);
         exit;
@@ -491,8 +504,44 @@ include THEME_PATH . '/header.php';
             </div>
 
             <label>Embedded Logo (Optional — PNG or JPG only)</label>
-            <input type="file" name="logo" accept="image/png, image/jpeg">
-            <button type="submit" class="btn" style="width:100%; margin-top:20px;">Generate QR</button>
+                        <input type="file" name="logo" accept="image/png, image/jpeg">
+
+                        <!-- ── Design Options (collapsible) ────────────────────────────── -->
+                        <div class="design-options" style="margin-top:16px; border:1px solid #333; border-radius:8px; overflow:hidden;">
+                            <div class="design-toggle" onclick="toggleDesign(this)"
+                                 style="padding:12px 14px; background:#1a1a1a; cursor:pointer; display:flex; justify-content:space-between; align-items:center; user-select:none;">
+                                <span style="font-weight:600; font-size:0.95rem;">▼ Design Options</span>
+                                <span class="design-arrow" style="font-size:0.8rem; opacity:0.6;">▼</span>
+                            </div>
+                            <div class="design-body" style="padding:14px; display:none; border-top:1px solid #333; background:#151515;">
+                                <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px; cursor:pointer;">
+                                    <input type="hidden" name="dot_modules" value="0">
+                                    <input type="checkbox" name="dot_modules" value="1">
+                                    <span>Round modules</span>
+                                </label>
+                                <label style="display:flex; align-items:center; gap:8px; margin-bottom:14px; cursor:pointer;">
+                                    <input type="hidden" name="logo_frame" value="0">
+                                    <input type="checkbox" name="logo_frame" value="1">
+                                    <span>Logo frame (white circle)</span>
+                                </label>
+                                <div style="display:flex; flex-wrap:wrap; gap:12px;">
+                                    <label style="flex:1; min-width:120px;">
+                                        Body color:
+                                        <input type="color" name="color_body" value="#000000" style="display:block; width:100%; height:36px; padding:2px; border:1px solid #444; border-radius:4px; background:transparent; cursor:pointer;">
+                                    </label>
+                                    <label style="flex:1; min-width:120px;">
+                                        Corner color:
+                                        <input type="color" name="color_finders" value="#000000" style="display:block; width:100%; height:36px; padding:2px; border:1px solid #444; border-radius:4px; background:transparent; cursor:pointer;">
+                                    </label>
+                                    <label style="flex:1; min-width:120px;">
+                                        Background:
+                                        <input type="color" name="color_bg" value="#ffffff" style="display:block; width:100%; height:36px; padding:2px; border:1px solid #444; border-radius:4px; background:transparent; cursor:pointer;">
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn" style="width:100%; margin-top:20px;">Generate QR</button>
         </form>
     </div>
 </div>
@@ -547,6 +596,41 @@ include THEME_PATH . '/header.php';
             </div>
 
             <button type="submit" class="btn" style="width:100%; margin-top:20px;">Save Changes</button>
+
+            <!-- ── Design Options (collapsible) for Edit ───────────────────── -->
+            <div class="design-options" style="margin-top:16px; border:1px solid #333; border-radius:8px; overflow:hidden;">
+                <div class="design-toggle" onclick="toggleDesign(this)"
+                     style="padding:12px 14px; background:#1a1a1a; cursor:pointer; display:flex; justify-content:space-between; align-items:center; user-select:none;">
+                    <span style="font-weight:600; font-size:0.95rem;">▼ Design Options</span>
+                    <span class="design-arrow" style="font-size:0.8rem; opacity:0.6;">▼</span>
+                </div>
+                <div class="design-body" style="padding:14px; display:none; border-top:1px solid #333; background:#151515;">
+                    <label style="display:flex; align-items:center; gap:8px; margin-bottom:10px; cursor:pointer;">
+                        <input type="hidden" name="dot_modules" value="0">
+                        <input type="checkbox" name="dot_modules" value="1" id="editDotModules">
+                        <span>Round modules</span>
+                    </label>
+                    <label style="display:flex; align-items:center; gap:8px; margin-bottom:14px; cursor:pointer;">
+                        <input type="hidden" name="logo_frame" value="0">
+                        <input type="checkbox" name="logo_frame" value="1" id="editLogoFrame">
+                        <span>Logo frame (white circle)</span>
+                    </label>
+                    <div style="display:flex; flex-wrap:wrap; gap:12px;">
+                        <label style="flex:1; min-width:120px;">
+                            Body color:
+                            <input type="color" name="color_body" id="editColorBody" value="#000000" style="display:block; width:100%; height:36px; padding:2px; border:1px solid #444; border-radius:4px; background:transparent; cursor:pointer;">
+                        </label>
+                        <label style="flex:1; min-width:120px;">
+                            Corner color:
+                            <input type="color" name="color_finders" id="editColorFinders" value="#000000" style="display:block; width:100%; height:36px; padding:2px; border:1px solid #444; border-radius:4px; background:transparent; cursor:pointer;">
+                        </label>
+                        <label style="flex:1; min-width:120px;">
+                            Background:
+                            <input type="color" name="color_bg" id="editColorBg" value="#ffffff" style="display:block; width:100%; height:36px; padding:2px; border:1px solid #444; border-radius:4px; background:transparent; cursor:pointer;">
+                        </label>
+                    </div>
+                </div>
+            </div>
         </form>
     </div>
 </div>
@@ -611,6 +695,19 @@ function closeModal(id) { document.getElementById(id).style.display = 'none'; }
 window.addEventListener('click', function(e) {
     if (e.target.classList.contains('modal')) e.target.style.display = 'none';
 });
+
+// ── Design Options toggle ────────────────────────────────────────────────────
+function toggleDesign(el) {
+    const body = el.parentElement.querySelector('.design-body');
+    const arrow = el.querySelector('.design-arrow');
+    if (body.style.display === 'none') {
+        body.style.display = 'block';
+        arrow.textContent = '▲';
+    } else {
+        body.style.display = 'none';
+        arrow.textContent = '▼';
+    }
+}
 
 // ── Print ────────────────────────────────────────────────────────────────────
 function printQR() {
@@ -680,9 +777,16 @@ function openEditModal(data) {
         const lbl = { url:'Target URL', phone:'Phone Number', map:'Map Address', social:'Profile URL' };
         document.getElementById('editGeneralLabel').textContent = lbl[type] || 'Target';
         document.getElementById('editTarget').value = target;
-    }
+            }
 
-    openModal('editModal');
+            // Pre-fill design options
+            document.getElementById('editDotModules').checked  = data.dot_modules == 1;
+            document.getElementById('editLogoFrame').checked   = data.logo_frame == 1;
+            document.getElementById('editColorBody').value     = data.color_body || '#000000';
+            document.getElementById('editColorFinders').value  = data.color_finders || '#000000';
+            document.getElementById('editColorBg').value       = data.color_bg || '#ffffff';
+
+            openModal('editModal');
 }
 
 // ── Toggle QR active ─────────────────────────────────────────────────────────

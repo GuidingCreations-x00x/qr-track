@@ -8,9 +8,9 @@ FTP_PASS = 'ConnectPhi@369'
 FTP_DIR = '.'
 
 FILES = [
-    '/Users/mana/Herm/Projects/03-Work/QR-Track/client_analytics.php',
-    '/Users/mana/Herm/Projects/03-Work/QR-Track/manifest.json',
+    '/Users/mana/Herm/Projects/03-Work/QR-Track/config.php',
     '/Users/mana/Herm/Projects/03-Work/QR-Track/index.php',
+    '/Users/mana/Herm/Projects/03-Work/QR-Track/generate_image.php',
 ]
 
 ftp = ftplib.FTP(FTP_HOST)
