@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 // --- AUTHENTICATION SETTINGS ---
 define('ADMIN_USER', 'admin');
-define('ADMIN_PASS', '0IVUW2SA2pmPXtEa');
+define('ADMIN_PASS', 'Connect@4045');
 
 // --- API SETTINGS ---
 // Generated: 2026-06-28 for GuidingCreations-x00x/qr-track
