@@ -883,7 +883,7 @@ include THEME_PATH . '/header.php';
     <div class="ca-collapsible-header" onclick="toggleQrSection()">
         <h3 style="margin:0;">QR Code Management</h3>
         <span style="display:flex; gap:8px; align-items:center;">
-            <button class="btn btn-sm" onclick="event.stopPropagation(); openAddModalForClient('<?= htmlspecialchars($selectedClient, ENT_QUOTES) ?>')">+ New QR Code</button>
+            <a href="<?= htmlspecialchars(BASE_URL) ?>/generator.php?client=<?= urlencode($selectedClient) ?>" class="btn btn-sm">+ New QR Code</a>
             <span class="ca-collapsible-toggle" id="qrToggle">Show</span>
         </span>
     </div>
@@ -891,7 +891,7 @@ include THEME_PATH . '/header.php';
         <?php if (empty($qrCodes)): ?>
         <div class="ca-placeholder" style="margin-top:15px;">
             No QR codes for this client yet.
-            <br><button class="btn btn-sm" style="margin-top:10px;" onclick="openAddModalForClient('<?= htmlspecialchars($selectedClient, ENT_QUOTES) ?>')">+ Add the First QR Code</button>
+            <a href="<?= htmlspecialchars(BASE_URL) ?>/generator.php?client=<?= urlencode($selectedClient) ?>" class="btn btn-sm" style="margin-top:10px;">+ Add the First QR Code</a>
         </div>
         <?php else: ?>
         <div style="margin-top:15px; display:flex; flex-direction:column; gap:8px;">

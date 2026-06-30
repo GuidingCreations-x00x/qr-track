@@ -113,7 +113,7 @@
         <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end;">
             <a href="<?= htmlspecialchars(BASE_URL) ?>/client_analytics.php" class="btn btn-sm" style="background:#444;">Analytics</a>
             <a href="<?= htmlspecialchars(BASE_URL) ?>/api_instructions.php" class="btn btn-info btn-sm">API</a>
-            <button class="btn btn-sm" onclick="openModal('addModal')">+ New QR Code</button>
+            <a href="<?= htmlspecialchars(BASE_URL) ?>/generator.php" class="btn btn-sm">+ New QR Code</a>
             <a href="<?= htmlspecialchars(BASE_URL) ?>/logout.php" class="btn btn-logout btn-sm">Logout</a>
         </div>
         <?php endif; ?>

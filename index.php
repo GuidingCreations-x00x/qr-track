@@ -447,8 +447,11 @@ include THEME_PATH . '/header.php';
                 Last scan: <?= $group['last_scan'] ? date('M d', strtotime($group['last_scan'])) : 'Never' ?>
             </div>
             <a href="<?= htmlspecialchars(BASE_URL) ?>/client_analytics.php?client=<?= urlencode($group['target_data']) ?>" class="card-view-link">
-                View Analytics &rarr;
-            </a>
+                            View Analytics &rarr;
+                        </a>
+                        <a href="<?= htmlspecialchars(BASE_URL) ?>/generator.php?client=<?= urlencode($group['target_data']) ?>" class="card-view-link" style="background:#444; margin-top:5px;">
+                            + Add QR
+                        </a>
         </div>
     </div>
     <?php endforeach; ?>

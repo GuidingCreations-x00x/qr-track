@@ -127,6 +127,10 @@ try {
         $db->exec("ALTER TABLE products ADD COLUMN color_finders TEXT DEFAULT '#000000'");
         $db->exec("ALTER TABLE products ADD COLUMN color_bg TEXT DEFAULT '#ffffff'");
     }
+    if (!in_array('dot_style', $columns)) {
+        $db->exec("ALTER TABLE products ADD COLUMN dot_style TEXT DEFAULT 'square'");
+        $db->exec("ALTER TABLE products ADD COLUMN corner_style TEXT DEFAULT 'square'");
+    }
 
     $db->exec("CREATE TABLE IF NOT EXISTS api_tokens (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
